@@ -1,0 +1,4 @@
+module(
+    name = "multicore_dag_schedule",
+    version = "0.1.0",
+)

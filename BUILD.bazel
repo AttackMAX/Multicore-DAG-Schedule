@@ -5,59 +5,36 @@ cc_library(
         "include/dag/task_node.h",
     ],
     srcs = [
-        "src/dag_graph.cc",
+        "src/dag_graph.cpp",
     ],
     includes = ["include"],
     visibility = ["//visibility:public"],
 )
 
 cc_library(
-    name = "scheduler_core",
-    hdrs = [
-        "include/scheduler/schedule_result.h",
-        "include/scheduler/task_scheduler.h",
-    ],
+    name = "node_priority_assignment_algorithm",
+    hdrs = ["include/algorithms/node_priority_assignment_algorithm.h"],
+    srcs = ["src/algorithms/node_priority_assignment_algorithm.cpp"],
     includes = ["include"],
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "critical_path_scheduler",
-    hdrs = ["include/algorithms/critical_path_scheduler.h"],
-    srcs = ["src/algorithms/critical_path_scheduler.cc"],
-    includes = ["include"],
-    deps = [
-        ":dag_core",
-        ":scheduler_core",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "list_baseline_scheduler",
-    hdrs = ["include/algorithms/list_baseline_scheduler.h"],
-    srcs = ["src/algorithms/list_baseline_scheduler.cc"],
-    includes = ["include"],
-    deps = [
-        ":dag_core",
-        ":scheduler_core",
-    ],
+    deps = [":dag_core"],
     visibility = ["//visibility:public"],
 )
 
 cc_binary(
     name = "dag_scheduler_app",
-    srcs = ["src/main.cc"],
+    srcs = ["src/main.cpp"],
     deps = [
-        ":critical_path_scheduler",
+        ":node_priority_assignment_algorithm",
         ":dag_core",
-        ":list_baseline_scheduler",
     ],
     visibility = ["//visibility:public"],
 )
 
 cc_test(
     name = "dag_graph_test",
-    srcs = ["tests/dag_graph_test.cc"],
-    deps = [":dag_core"],
+    srcs = ["tests/dag_graph_test.cpp"],
+    deps = [
+        ":node_priority_assignment_algorithm",
+        ":dag_core",
+    ],
 )

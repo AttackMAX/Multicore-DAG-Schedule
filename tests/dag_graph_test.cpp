@@ -44,7 +44,8 @@ int main() {
   if (metrics.critical_path_length <= 0) {
     return 1;
   }
-  if (metrics.lf.at(3) < metrics.lf.at(1) || metrics.lf.at(3) < metrics.lf.at(2)) {
+  if (metrics.lf.at(3) < metrics.lf.at(1) ||
+      metrics.lf.at(3) < metrics.lf.at(2)) {
     return 1;
   }
   if (metrics.lb.at(3) < metrics.lb.at(4)) {

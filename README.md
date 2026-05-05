@@ -131,6 +131,8 @@ python3 gen_compile_commands.py
 
 ## 已实现算法
 
+> 详细算法说明、函数签名、输入输出示例见 **[ALGORITHMS.md](./ALGORITHMS.md)**。
+
 当前已实现一个独立算法模块：`NodePriorityAssignmentAlgorithm`，包含三部分：
 
 1. 关键路径指标计算（动态规划）
@@ -145,10 +147,3 @@ python3 gen_compile_commands.py
    - 基于优先级与干扰集合估算每个节点最坏完成时间
    - 输出全局 worst response time
 
-## TODO
-
-- 新增更多对比算法文件（每种算法一个 `include/algorithms/*.h + src/algorithms/*.cpp`）
-- 抽象统一算法接口，便于批量对比运行
-- 增加 DAG 输入方式（文件输入/随机生成）
-- 补充实验评估脚本（多图规模、多核数、多算法）
-- 完善测试覆盖（边界图、随机图、异常输入）

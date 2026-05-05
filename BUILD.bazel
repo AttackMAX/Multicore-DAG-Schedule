@@ -22,11 +22,21 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "graham_response_time_algorithm",
+    hdrs = ["include/algorithms/graham_response_time_analysis.h"],
+    srcs = ["src/algorithms/graham_response_time_analysis.cpp"],
+    includes = ["include"],
+    deps = [":dag_core"],
+    visibility = ["//visibility:public"],
+)
+
 cc_binary(
     name = "dag_scheduler_app",
     srcs = ["src/main.cpp"],
     deps = [
         ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
         ":dag_core",
     ],
     visibility = ["//visibility:public"],
@@ -37,6 +47,7 @@ cc_test(
     srcs = ["tests/dag_graph_test.cpp"],
     deps = [
         ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
         ":dag_core",
     ],
 )

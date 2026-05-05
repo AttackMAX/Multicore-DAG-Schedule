@@ -8,6 +8,8 @@
   - [1. `ComputeCriticalPathMetrics` — 关键路径指标计算](#1-computecriticalpathmetrics--关键路径指标计算)
   - [2. `AssignPrioritiesByCriticalPath` — 节点优先级分配](#2-assignprioritiesbycriticalpath--节点优先级分配)
   - [3. `AnalyzeResponseTime` — 响应时间分析](#3-analyzeresponsetime--响应时间分析)
+- [算法模块：`algorithms::GrahamResponseTimeAlgorithm`](#算法模块algorithmsgrahamresponsetimealgorithm)
+  - [`Analyze` — Graham 任意调度响应时间分析](#analyze--graham-任意调度响应时间分析)
 
 ---
 
@@ -300,9 +302,133 @@ core_count = 2
 
 ---
 
+## 算法模块：`algorithms::GrahamResponseTimeAlgorithm`
+
+**文件：** `include/algorithms/graham_response_time_analysis.h` / `src/algorithms/graham_response_time_analysis.cpp`
+
+无状态类，提供与优先级调度算法对应的任意调度最坏情况分析，用作对比基线。
+
+---
+
+### `Analyze` — Graham 任意调度响应时间分析
+
+```cpp
+GrahamResponseTimeAnalysis Analyze(const dag::DagGraph& graph,
+                                    int core_count) const;
+```
+
+**功能：** 计算任意 work-conserving 调度下的最坏响应时间上界。不依赖优先级，仅基于 DAG 结构（祖先/后代关系）推导干扰集。
+
+**输入：**
+| 参数 | 类型 | 含义 |
+|------|------|------|
+| `graph` | `const dag::DagGraph&` | DAG 图 |
+| `core_count` | `int` | 处理器核心数 |
+
+**输出：** `GrahamResponseTimeAnalysis`
+
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| `finish_time[id]` | `double` | 节点 `id` 的最坏完成时间 |
+| `worst_response_time` | `double` | 全局最坏响应时间 = `max(finish_time)` |
+| `graham_makespan_bound` | `double` | Graham 全局上界 = `L + (W - L) / m` |
+| `critical_path_length` | `std::int64_t` | 关键路径长度 L |
+| `total_work` | `std::int64_t` | 总工作量 W = Σ duration |
+| `valid` | `bool` | `true` 表示分析成功 |
+
+**Graham 上界公式（Graham 1969）：**
+
+```
+makespan ≤ L + (W - L) / m
+```
+
+其中 `L` 为关键路径长度，`W` 为总工作量，`m` 为核心数。直观含义：关键路径节点必须串行执行（花费 L），剩余工作量 `W - L` 最多分散到 `m` 个核心并行，构成关键路径被延迟的上限。
+
+**干扰模型：**
+
+与优先级调度算法使用相同的递推框架，但干扰集定义不同：
+
+```
+finish_time[v] = max(finish_time[前驱])
+               + duration[v]
+               + Σ(干扰任务 duration) / core_count
+```
+
+其中**干扰任务**的定义为：与当前节点**不可比的节点**（既不是祖先也不是后代）。即：
+
+```
+干扰集(v) = { u | u 不是 v 的祖先, u 不是 v 的后代, u ≠ v }
+```
+
+与优先级方法的对比：
+
+| 维度 | 优先级调度 | Graham（任意调度） |
+|------|-----------|-------------------|
+| 干扰集 | 更高优先级的不可比节点 | **所有**不可比节点 |
+| 排除条件 | 优先级全序 + 祖先集 | 祖先集 + 后代集 |
+| 上界松紧 | 较紧 | 更悲观（保守） |
+
+优先级全序约束能缩小干扰集，因此其响应时间上界必然 ≤ Graham 上界。两者的比值体现了优先级分配带来的紧致性提升。
+
+**输入示例（沿用同一 DAG，core_count=2）：**
+
+```
+节点: 1(dur=5), 2(dur=3), 3(dur=8), 4(dur=2)
+边:   1→3, 2→3, 3→4
+core_count = 2
+L = 15, W = 18
+```
+
+**执行过程：**
+
+**节点 1：**
+- 祖先：{}, 后代：{3, 4}
+- 不可比节点：{2}（既不是 1 的祖先也不是后代）
+- 干扰：[2] duration = 3
+- `finish_time[1] = 0 + 5 + 3/2 = 6.5`
+
+**节点 2：**
+- 祖先：{}, 后代：{3, 4}
+- 不可比节点：{1}
+- 干扰：[1] duration = 5
+- `finish_time[2] = 0 + 3 + 5/2 = 5.5`
+
+**节点 3：**
+- 祖先：{1, 2}, 后代：{4}
+- 不可比节点：{}（所有 4 个节点均被祖先/后代包含）
+- 干扰：0
+- `finish_time[3] = max(6.5, 5.5) + 8 + 0 = 14.5`
+
+**节点 4：**
+- 祖先：{1, 2, 3}, 后代：{}
+- 不可比节点：{}
+- 干扰：0
+- `finish_time[4] = 14.5 + 2 + 0 = 16.5`
+
+**输出：**
+
+| 节点 | finish_time (优先级) | finish_time (Graham) |
+|------|---------------------|---------------------|
+| 1 | 5.0 | 6.5 |
+| 2 | 5.5 | 5.5 |
+| 3 | 13.5 | 14.5 |
+| 4 | 15.5 | 16.5 |
+
+```
+worst_response_time (优先级) = 15.5
+worst_response_time (Graham)  = 16.5
+Graham makespan bound L+(W-L)/m = 16.5
+
+紧致比 = 15.5 / 16.5 ≈ 0.939
+```
+
+**失败情况：** `core_count <= 0` 或图中存在环时，`valid = false`。
+
+---
+
 ## 完整流水线示例
 
-`src/main.cpp` 中的端到端调用：
+`src/main.cpp` 中的端到端调用，同时运行两种算法并对比：
 
 ```cpp
 // 构建 DAG
@@ -315,19 +441,28 @@ graph.AddEdge(1, 3);
 graph.AddEdge(2, 3);
 graph.AddEdge(3, 4);
 
-algorithms::NodePriorityAssignmentAlgorithm algorithm;
+const int core_count = 2;
 
-// 步骤 1：计算关键路径指标
-auto metrics = algorithm.ComputeCriticalPathMetrics(graph);
+// === 优先级调度分析 ===
+algorithms::NodePriorityAssignmentAlgorithm priority_algo;
+
+auto metrics = priority_algo.ComputeCriticalPathMetrics(graph);
 // metrics.critical_path_length = 15
-// metrics.longest_path = {1:15, 2:11, 3:15, 4:15}
 
-// 步骤 2：分配优先级
-auto priorities = algorithm.AssignPrioritiesByCriticalPath(graph, metrics);
+auto priorities = priority_algo.AssignPrioritiesByCriticalPath(graph, metrics);
 // priorities = [1, 2, 3, 4]
 
-// 步骤 3：分析响应时间
-auto response = algorithm.AnalyzeResponseTime(graph, priorities, 2);
-// response.worst_response_time = 15.5
-// response.finish_time = {1:5.0, 2:5.5, 3:13.5, 4:15.5}
+auto prio_response = priority_algo.AnalyzeResponseTime(graph, priorities, core_count);
+// prio_response.worst_response_time = 15.5
+
+// === Graham 任意调度分析 ===
+algorithms::GrahamResponseTimeAlgorithm graham_algo;
+
+auto graham_response = graham_algo.Analyze(graph, core_count);
+// graham_response.worst_response_time = 16.5
+// graham_response.graham_makespan_bound = 16.5
+
+// === 对比 ===
+// prio_response.worst_response_time <= graham_response.worst_response_time ✓
+// 紧致比 ≈ 0.939
 ```

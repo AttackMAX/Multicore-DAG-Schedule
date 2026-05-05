@@ -85,40 +85,74 @@ GrahamResponseTimeAnalysis GrahamResponseTimeAlgorithm::Analyze(
   double m = static_cast<double>(core_count);
   analysis.graham_makespan_bound = L + (W - L) / m;
 
+  // Pre-compute I(v) = incomparable set for each vertex
+  std::unordered_map<int, std::unordered_set<int>> I_v;
+  I_v.reserve(graph.NodeCount());
+  for (const dag::TaskNode& node : graph.Nodes()) {
+    std::unordered_set<int> iv;
+    const auto& anc = ancestors[node.id];
+    const auto& desc = descendants[node.id];
+    for (const dag::TaskNode& cand : graph.Nodes()) {
+      if (cand.id == node.id) continue;
+      if (anc.find(cand.id) != anc.end()) continue;
+      if (desc.find(cand.id) != desc.end()) continue;
+      iv.insert(cand.id);
+    }
+    I_v[node.id] = std::move(iv);
+  }
+
+  auto vol_of = [&](const std::unordered_set<int>& ids) -> std::int64_t {
+    std::int64_t total = 0;
+    for (int id : ids) {
+      const dag::TaskNode* n = graph.GetNode(id);
+      if (n != nullptr) total += n->duration;
+    }
+    return total;
+  };
+
+  // DP with union-based interference sets
+  std::unordered_map<int, std::int64_t> path_len;
+  std::unordered_map<int, std::unordered_set<int>> path_I;
+  path_len.reserve(graph.NodeCount());
+  path_I.reserve(graph.NodeCount());
   analysis.finish_time.reserve(graph.NodeCount());
+
   for (int node_id : topo) {
     const dag::TaskNode* node = graph.GetNode(node_id);
     if (node == nullptr) {
       return {};
     }
 
-    double pred_finish_max = 0.0;
-    for (int pred : predecessors[node_id]) {
-      pred_finish_max =
-          std::max(pred_finish_max, analysis.finish_time[pred]);
+    if (predecessors[node_id].empty()) {
+      path_len[node_id] = node->duration;
+      path_I[node_id] = {};
+    } else {
+      double best_R = -1.0;
+      int best_u = -1;
+      for (int u : predecessors[node_id]) {
+        std::unordered_set<int> cand_I = path_I[u];
+        const auto& iv = I_v[node_id];
+        cand_I.insert(iv.begin(), iv.end());
+
+        std::int64_t cand_vol = vol_of(cand_I);
+        double cand_R = static_cast<double>(path_len[u]) +
+                        static_cast<double>(node->duration) +
+                        static_cast<double>(cand_vol) / m;
+        if (cand_R > best_R) {
+          best_R = cand_R;
+          best_u = u;
+        }
+      }
+      path_len[node_id] = path_len[best_u] + node->duration;
+      path_I[node_id] = path_I[best_u];
+      path_I[node_id].insert(I_v[node_id].begin(), I_v[node_id].end());
     }
 
-    const auto& anc = ancestors[node_id];
-    const auto& desc = descendants[node_id];
-    double interference = 0.0;
-    for (const dag::TaskNode& candidate : graph.Nodes()) {
-      if (candidate.id == node_id) {
-        continue;
-      }
-      if (anc.find(candidate.id) != anc.end()) {
-        continue;
-      }
-      if (desc.find(candidate.id) != desc.end()) {
-        continue;
-      }
-      interference += static_cast<double>(candidate.duration);
-    }
-
-    double finish_time = pred_finish_max + static_cast<double>(node->duration) +
-                         interference / m;
-    analysis.finish_time[node_id] = finish_time;
-    analysis.worst_response_time =
-        std::max(analysis.worst_response_time, finish_time);
+    std::int64_t total_I_vol = vol_of(path_I[node_id]);
+    double r = static_cast<double>(path_len[node_id]) +
+               static_cast<double>(total_I_vol) / m;
+    analysis.finish_time[node_id] = r;
+    analysis.worst_response_time = std::max(analysis.worst_response_time, r);
   }
 
   analysis.valid = true;

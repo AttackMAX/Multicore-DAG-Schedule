@@ -75,7 +75,28 @@ bazel test //:dag_graph_test --test_output=all
 bazel run //:dag_scheduler_app
 ```
 
-## 6. （可选）配置 VS Code clangd 智能提示
+## 6. 生成可视化对比图
+
+### 安装 Python 依赖
+
+```bash
+pip3 install --user matplotlib numpy
+```
+
+### 生成对比图
+
+```bash
+# 单张图：核心数扫描
+bazel run //:dag_scheduler_compare -- --param cores --from 1 --to 8 --dag random_20 \
+    | python3 scripts/plot_comparison.py --output output/compare.png
+
+# 批量生成（6 张图，覆盖不同 DAG 类型和参数维度）
+bash scripts/run_pipeline.sh
+```
+
+生成的 PNG 图片在 `output/` 目录中。
+
+## 7. （可选）配置 VS Code clangd 智能提示
 
 生成编译数据库：
 

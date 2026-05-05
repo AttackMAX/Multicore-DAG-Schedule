@@ -31,6 +31,35 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "json_utils",
+    hdrs = ["include/utils/json_utils.h"],
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "dag_generator",
+    hdrs = ["include/algorithms/dag_generator.h"],
+    srcs = ["src/algorithms/dag_generator.cpp"],
+    includes = ["include"],
+    deps = [":dag_core"],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "dag_scheduler_compare",
+    srcs = ["src/compare_main.cpp"],
+    deps = [
+        ":dag_core",
+        ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
+        ":dag_generator",
+        ":json_utils",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 cc_binary(
     name = "dag_scheduler_app",
     srcs = ["src/main.cpp"],

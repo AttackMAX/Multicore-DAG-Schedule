@@ -69,10 +69,23 @@ bazel run //:dag_scheduler_app            # 运行对比程序
 
 详细环境搭建步骤见 [docs/quickstart.md](./docs/quickstart.md)。
 
+## 可视化
+
+支持参数扫描对比图，直观展示两种算法的上界差异：
+
+```bash
+pip3 install --user matplotlib numpy
+bash scripts/run_pipeline.sh       # 批量生成 output/*.png
+```
+
+图表类型：
+- **核心数扫描**：固定 DAG，横轴 m=1..N，纵轴 worst response time
+- **DAG 规模扫描**：固定核心数，横轴节点数，纵轴 worst response time
+
+详见 [docs/quickstart.md](./docs/quickstart.md#6-生成可视化对比图)。
+
 ## 下一步
 
 - 新增更多对比算法（如 G-EDF 响应时间分析、Federated Scheduling）
 - 支持外部 DAG 输入（文件读取 / 随机生成）
-- 补充实验评估脚本（多图规模 × 多核数 × 多算法）
 - 统一算法接口，便于批量对比
-- 可视化调度甘特图与上界对比曲线

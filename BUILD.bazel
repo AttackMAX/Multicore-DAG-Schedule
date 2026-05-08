@@ -47,6 +47,19 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+cc_library(
+    name = "minimum_core_algorithm",
+    hdrs = ["include/algorithms/minimum_core_algorithm.h"],
+    srcs = ["src/algorithms/minimum_core_algorithm.cpp"],
+    includes = ["include"],
+    deps = [
+        ":dag_core",
+        ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 cc_binary(
     name = "dag_scheduler_compare",
     srcs = ["src/compare_main.cpp"],
@@ -56,6 +69,20 @@ cc_binary(
         ":graham_response_time_algorithm",
         ":dag_generator",
         ":json_utils",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "dag_cores_compare",
+    srcs = ["src/compare_cores_main.cpp"],
+    deps = [
+        ":dag_core",
+        ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
+        ":dag_generator",
+        ":json_utils",
+        ":minimum_core_algorithm",
     ],
     visibility = ["//visibility:public"],
 )
@@ -77,6 +104,7 @@ cc_test(
     deps = [
         ":node_priority_assignment_algorithm",
         ":graham_response_time_algorithm",
+        ":minimum_core_algorithm",
         ":dag_core",
     ],
 )

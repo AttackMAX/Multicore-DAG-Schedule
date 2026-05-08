@@ -16,9 +16,10 @@ python3 -c "import matplotlib; import numpy" 2>/dev/null || {
 }
 
 echo "=== Building C++ binaries ==="
-(cd "${PROJECT_ROOT}" && bazel build //:dag_scheduler_compare)
+(cd "${PROJECT_ROOT}" && bazel build //:dag_scheduler_compare //:dag_cores_compare)
 
 BIN="${PROJECT_ROOT}/bazel-bin/dag_scheduler_compare"
+BIN_CORES="${PROJECT_ROOT}/bazel-bin/dag_cores_compare"
 
 echo "=== Generating comparison curves ==="
 
@@ -36,6 +37,16 @@ for m in 2 4 8; do
     "${BIN}" --param nodes --from 5 --to 50 --step 5 --cores "${m}" \
         | python3 "${SCRIPTS_DIR}/plot_comparison.py" \
             --output "${OUTPUT_DIR}/compare_nodes_m${m}.png"
+done
+
+echo ""
+echo "=== Generating minimum-cores comparison ==="
+
+for dag in random_20 fork_join_30 chain_20; do
+    echo "  Sweeping target RT for ${dag}..."
+    "${BIN_CORES}" --dag "${dag}" \
+        | python3 "${SCRIPTS_DIR}/plot_cores_comparison.py" \
+            --output "${OUTPUT_DIR}/cores_compare_${dag}.png"
 done
 
 echo ""

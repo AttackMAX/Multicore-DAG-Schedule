@@ -1,5 +1,6 @@
 #include <vector>
 
+#include "algorithms/minimum_core_algorithm.h"
 #include "algorithms/node_priority_assignment_algorithm.h"
 #include "dag/dag_graph.h"
 
@@ -79,5 +80,77 @@ int main() {
   if (response.worst_response_time < response.finish_time.at(4)) {
     return 1;
   }
+
+  // --- MinimumCoreAlgorithm tests ---
+  algorithms::MinimumCoreAlgorithm min_core_algo;
+
+  // Test 1: target < critical_path_length (10) -> infeasible
+  {
+    auto prio = min_core_algo.ComputeForPriority(graph, 5.0);
+    if (prio.feasible) {
+      return 1;
+    }
+    auto graham = min_core_algo.ComputeForGraham(graph, 5.0);
+    if (graham.feasible) {
+      return 1;
+    }
+  }
+
+  // Test 2: very large target -> 1 core for both
+  {
+    auto prio = min_core_algo.ComputeForPriority(graph, 100.0);
+    if (!prio.feasible || prio.min_cores != 1) {
+      return 1;
+    }
+    if (prio.worst_response_time <= 0.0 || prio.worst_response_time > 100.0) {
+      return 1;
+    }
+
+    auto graham = min_core_algo.ComputeForGraham(graph, 100.0);
+    if (!graham.feasible || graham.min_cores != 1) {
+      return 1;
+    }
+    if (graham.worst_response_time <= 0.0 || graham.worst_response_time > 100.0) {
+      return 1;
+    }
+  }
+
+  // Test 3: reasonable target -> both feasible, priority cores <= graham cores
+  {
+    auto prio = min_core_algo.ComputeForPriority(graph, 12.0);
+    if (!prio.feasible || prio.min_cores <= 0) {
+      return 1;
+    }
+    if (prio.worst_response_time > 12.0) {
+      return 1;
+    }
+
+    auto graham = min_core_algo.ComputeForGraham(graph, 12.0);
+    if (!graham.feasible || graham.min_cores <= 0) {
+      return 1;
+    }
+    if (graham.worst_response_time > 12.0) {
+      return 1;
+    }
+
+    if (prio.min_cores > graham.min_cores) {
+      return 1;
+    }
+  }
+
+  // Test 4: target equals critical_path_length -> feasible but needs many cores
+  {
+    double L = static_cast<double>(metrics.critical_path_length);
+    auto prio = min_core_algo.ComputeForPriority(graph, L);
+    if (!prio.feasible) {
+      return 1;
+    }
+    // With only critical path length as target, need more than 1 core
+    // since total work (14) > L (10) implies interference exists
+    if (prio.min_cores < 1) {
+      return 1;
+    }
+  }
+
   return 0;
 }

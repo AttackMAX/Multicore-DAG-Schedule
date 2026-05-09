@@ -22,6 +22,40 @@
 | [快速开始](./docs/quickstart.md) | 环境搭建、构建、运行 |
 | [算法文档](./docs/algorithms.md) | 数据结构、两个算法的详细推导与示例 |
 
+## 外部 DAG 输入
+
+支持从文件加载 DAG，目前支持 **Standard Task Graph Set (STG)** 格式——调度研究中广泛使用的基准测试集。
+
+### STG 格式
+
+STG 文件使用固定宽度空格分隔字段：
+
+```
+<任务总数>
+<节点ID> <执行时间> <前驱数> [<前驱1> ...]
+...
+```
+
+文件中包含两个虚拟节点（源节点 ID=0 和汇节点 ID=N+1），加载时自动剥离。
+
+### 使用方式
+
+所有程序的 `--dag` 参数均支持 `stg:<路径>` 前缀：
+
+```bash
+# 单次分析
+bazel run //:dag_scheduler_app -- --dag stg:$PWD/stg/50/rand0001.stg
+
+# 核心数扫描
+bazel run //:dag_scheduler_compare -- --dag stg:stg/100/rand0001.stg \
+    --param cores --from 2 --to 8
+
+# 最小组核心数分析
+bazel run //:dag_cores_compare -- --dag stg:stg/500/rand0001.stg --max-cores 32
+```
+
+同时也支持内置生成器命名的 DAG：`chain_N`、`fork_join_N`、`random_N`。
+
 ## 已实现算法
 
 ### 1. 优先级调度分析 (`NodePriorityAssignmentAlgorithm`)
@@ -45,16 +79,30 @@
 ├── include/
 │   ├── algorithms/
 │   │   ├── node_priority_assignment_algorithm.h
-│   │   └── graham_response_time_analysis.h
-│   └── dag/
-│       ├── dag_graph.h
-│       └── task_node.h
+│   │   ├── graham_response_time_analysis.h
+│   │   ├── dag_generator.h
+│   │   └── minimum_core_algorithm.h
+│   ├── dag/
+│   │   ├── dag_graph.h
+│   │   └── task_node.h
+│   ├── io/
+│   │   └── stg_reader.h                  # STG 文件读取器
+│   └── utils/
+│       └── json_utils.h
 ├── src/
 │   ├── algorithms/
 │   │   ├── node_priority_assignment_algorithm.cpp
-│   │   └── graham_response_time_analysis.cpp
+│   │   ├── graham_response_time_analysis.cpp
+│   │   ├── dag_generator.cpp
+│   │   └── minimum_core_algorithm.cpp
+│   ├── io/
+│   │   └── stg_reader.cpp               # STG 格式解析实现
 │   ├── dag_graph.cpp
-│   └── main.cpp                          # 双算法对比入口
+│   ├── main.cpp                         # 基本对比程序（支持 --dag）
+│   ├── compare_main.cpp                 # 参数扫描工具
+│   └── compare_cores_main.cpp           # 最小核心数分析
+├── scripts/
+│   └── run_pipeline.sh                  # 批量对比脚本
 └── tests/
     └── dag_graph_test.cpp
 ```
@@ -87,5 +135,6 @@ bash scripts/run_pipeline.sh       # 批量生成 output/*.png
 ## 下一步
 
 - 新增更多对比算法（如 G-EDF 响应时间分析、Federated Scheduling）
-- 支持外部 DAG 输入（文件读取 / 随机生成）
+- 支持更多外部 DAG 输入格式（如 DAGgen、TGFF）
 - 统一算法接口，便于批量对比
+- STG 基准数据批量评测脚本

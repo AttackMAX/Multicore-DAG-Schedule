@@ -54,17 +54,9 @@ int main(int argc, char* argv[]) {
   if (param_name == "nodes") {
     base_dag.label = dag_name;
   } else {
-    if (dag_name.find("chain_") == 0) {
-      int n = std::stoi(dag_name.substr(6));
-      base_dag = algorithms::DAGGenerator::Chain(n);
-    } else if (dag_name.find("fork_join_") == 0) {
-      int n = std::stoi(dag_name.substr(10));
-      base_dag = algorithms::DAGGenerator::ForkJoin(n);
-    } else if (dag_name.find("random_") == 0) {
-      int n = std::stoi(dag_name.substr(7));
-      base_dag = algorithms::DAGGenerator::RandomDAG(n, 0.3, 42);
-    } else {
-      std::cerr << "Unknown DAG name: " << dag_name << "\n";
+    base_dag = algorithms::DAGGenerator::Resolve(dag_name);
+    if (base_dag.graph.NodeCount() == 0) {
+      std::cerr << "Unknown or empty DAG: " << dag_name << "\n";
       return 1;
     }
   }

@@ -1,20 +1,40 @@
+#include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
+#include "algorithms/dag_generator.h"
 #include "algorithms/graham_response_time_analysis.h"
 #include "algorithms/node_priority_assignment_algorithm.h"
 #include "dag/dag_graph.h"
 
-int main() {
+int main(int argc, char* argv[]) {
   dag::DagGraph graph;
-  graph.AddNode(1, 5);
-  graph.AddNode(2, 3);
-  graph.AddNode(3, 8);
-  graph.AddNode(4, 2);
 
-  graph.AddEdge(1, 3);
-  graph.AddEdge(2, 3);
-  graph.AddEdge(3, 4);
+  std::string dag_name;
+  for (int i = 1; i < argc - 1; ++i) {
+    if (std::string(argv[i]) == "--dag") {
+      dag_name = argv[i + 1];
+      break;
+    }
+  }
+
+  if (!dag_name.empty()) {
+    auto generated = algorithms::DAGGenerator::Resolve(dag_name);
+    graph = generated.graph;
+    if (graph.NodeCount() == 0) {
+      std::cerr << "Failed to load DAG: " << dag_name << "\n";
+      return 1;
+    }
+  } else {
+    graph.AddNode(1, 5);
+    graph.AddNode(2, 3);
+    graph.AddNode(3, 8);
+    graph.AddNode(4, 2);
+    graph.AddEdge(1, 3);
+    graph.AddEdge(2, 3);
+    graph.AddEdge(3, 4);
+  }
 
   const int core_count = 2;
 

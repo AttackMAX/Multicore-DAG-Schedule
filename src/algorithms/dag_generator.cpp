@@ -4,6 +4,8 @@
 #include <ctime>
 #include <random>
 
+#include "io/stg_reader.h"
+
 namespace algorithms {
 
 GeneratedDag DAGGenerator::Chain(int n, std::int64_t duration) {
@@ -55,6 +57,29 @@ GeneratedDag DAGGenerator::RandomDAG(int n, double edge_prob,
     }
   }
   return dag;
+}
+
+GeneratedDag DAGGenerator::Resolve(const std::string& dag_name) {
+  if (dag_name.find("stg:") == 0) {
+    std::string path = dag_name.substr(4);
+    GeneratedDag dag;
+    dag.graph = io::StgReader::Read(path);
+    dag.label = "stg:" + path;
+    return dag;
+  }
+  if (dag_name.find("chain_") == 0) {
+    int n = std::stoi(dag_name.substr(6));
+    return Chain(n);
+  }
+  if (dag_name.find("fork_join_") == 0) {
+    int n = std::stoi(dag_name.substr(10));
+    return ForkJoin(n);
+  }
+  if (dag_name.find("random_") == 0) {
+    int n = std::stoi(dag_name.substr(7));
+    return RandomDAG(n, 0.3, 42);
+  }
+  return {};
 }
 
 std::vector<GeneratedDag> DAGGenerator::GalleryExamples() {

@@ -43,6 +43,18 @@ cc_library(
     hdrs = ["include/algorithms/dag_generator.h"],
     srcs = ["src/algorithms/dag_generator.cpp"],
     includes = ["include"],
+    deps = [
+        ":dag_core",
+        ":stg_reader",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "stg_reader",
+    hdrs = ["include/io/stg_reader.h"],
+    srcs = ["src/io/stg_reader.cpp"],
+    includes = ["include"],
     deps = [":dag_core"],
     visibility = ["//visibility:public"],
 )
@@ -69,6 +81,7 @@ cc_binary(
         ":graham_response_time_algorithm",
         ":dag_generator",
         ":json_utils",
+        ":stg_reader",
     ],
     visibility = ["//visibility:public"],
 )
@@ -83,6 +96,7 @@ cc_binary(
         ":dag_generator",
         ":json_utils",
         ":minimum_core_algorithm",
+        ":stg_reader",
     ],
     visibility = ["//visibility:public"],
 )
@@ -94,6 +108,8 @@ cc_binary(
         ":node_priority_assignment_algorithm",
         ":graham_response_time_algorithm",
         ":dag_core",
+        ":dag_generator",
+        ":stg_reader",
     ],
     visibility = ["//visibility:public"],
 )

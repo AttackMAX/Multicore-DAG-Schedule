@@ -44,18 +44,10 @@ int main(int argc, char* argv[]) {
   }
   std::ostream& os = *out;
 
-  algorithms::GeneratedDag generated;
-  if (dag_name.find("chain_") == 0) {
-    int n = std::stoi(dag_name.substr(6));
-    generated = algorithms::DAGGenerator::Chain(n);
-  } else if (dag_name.find("fork_join_") == 0) {
-    int n = std::stoi(dag_name.substr(10));
-    generated = algorithms::DAGGenerator::ForkJoin(n);
-  } else if (dag_name.find("random_") == 0) {
-    int n = std::stoi(dag_name.substr(7));
-    generated = algorithms::DAGGenerator::RandomDAG(n, 0.3, 42);
-  } else {
-    std::cerr << "Unknown DAG name: " << dag_name << "\n";
+  algorithms::GeneratedDag generated =
+      algorithms::DAGGenerator::Resolve(dag_name);
+  if (generated.graph.NodeCount() == 0) {
+    std::cerr << "Unknown or empty DAG: " << dag_name << "\n";
     return 1;
   }
 

@@ -2,6 +2,7 @@
 #define DAG_DAG_GRAPH_H_
 
 #include <cstddef>
+#include <unordered_map>
 #include <vector>
 
 #include "dag/task_node.h"
@@ -23,6 +24,7 @@ class DagGraph {
  private:
   int NodeIndex(int id) const;
   std::vector<TaskNode> nodes_;
+  std::unordered_map<int, int> id_to_index_;
 };
 
 } 

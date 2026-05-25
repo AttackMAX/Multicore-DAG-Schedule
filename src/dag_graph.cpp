@@ -11,6 +11,7 @@ bool DagGraph::AddNode(int id, long duration) {
   TaskNode node;
   node.id = id;
   node.duration = duration;
+  id_to_index_[id] = static_cast<int>(nodes_.size());
   nodes_.push_back(node);
   return true;
 }
@@ -83,12 +84,8 @@ std::vector<int> DagGraph::TopologicalOrder() const {
 }
 
 int DagGraph::NodeIndex(int id) const {
-  for (std::size_t i = 0; i < nodes_.size(); ++i) {
-    if (nodes_[i].id == id) {
-      return static_cast<int>(i);
-    }
-  }
-  return -1;
+  auto it = id_to_index_.find(id);
+  return (it != id_to_index_.end()) ? it->second : -1;
 }
 
 }

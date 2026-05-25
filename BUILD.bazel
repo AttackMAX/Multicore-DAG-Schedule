@@ -114,6 +114,21 @@ cc_binary(
     visibility = ["//visibility:public"],
 )
 
+cc_binary(
+    name = "dag_terminal",
+    srcs = ["src/terminal_app.cpp"],
+    deps = [
+        ":dag_core",
+        ":node_priority_assignment_algorithm",
+        ":graham_response_time_algorithm",
+        ":dag_generator",
+        ":json_utils",
+        ":minimum_core_algorithm",
+        ":stg_reader",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 cc_test(
     name = "dag_graph_test",
     srcs = ["tests/dag_graph_test.cpp"],

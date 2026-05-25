@@ -1,8 +1,11 @@
 #include "algorithms/node_priority_assignment_algorithm.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
+#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace algorithms {
 
@@ -142,6 +145,81 @@ std::vector<int> NodePriorityAssignmentAlgorithm::AssignPrioritiesByCriticalPath
   return priorities;
 }
 
+// ──── Compact bitset helpers (anonymous namespace) ────────────────────────
+
+namespace {
+
+class BitSet {
+ public:
+  explicit BitSet(int n) : n_(n), bits_((n + 63) / 64, 0) {}
+
+  void Set(int pos) { bits_[pos >> 6] |= (std::uint64_t{1} << (pos & 63)); }
+  bool Test(int pos) const {
+    return (bits_[pos >> 6] >> (pos & 63)) & std::uint64_t{1};
+  }
+  void ClearBit(int pos) {
+    bits_[pos >> 6] &= ~(std::uint64_t{1} << (pos & 63));
+  }
+  void SetAll() {
+    for (auto& w : bits_) w = ~std::uint64_t{0};
+    if (n_ % 64) bits_.back() &= (std::uint64_t{1} << (n_ % 64)) - 1;
+  }
+  void OrWith(const BitSet& o) {
+    for (std::size_t i = 0; i < bits_.size(); ++i) bits_[i] |= o.bits_[i];
+  }
+  void AndNot(const BitSet& o) {
+    for (std::size_t i = 0; i < bits_.size(); ++i) bits_[i] &= ~o.bits_[i];
+  }
+  void AndWith(const BitSet& o) {
+    for (std::size_t i = 0; i < bits_.size(); ++i) bits_[i] &= o.bits_[i];
+  }
+  const std::vector<std::uint64_t>& Words() const { return bits_; }
+  int Size() const { return n_; }
+
+ private:
+  int n_;
+  std::vector<std::uint64_t> bits_;
+};
+
+std::int64_t BitsetVol(const BitSet& bs,
+                       const std::vector<std::int64_t>& dur) {
+  std::int64_t total = 0;
+  const auto& words = bs.Words();
+  const int n = bs.Size();
+  for (std::size_t w = 0; w < words.size(); ++w) {
+    std::uint64_t m = words[w];
+    while (m) {
+      int bit = __builtin_ctzll(m);
+      int pos = static_cast<int>(w * 64 + bit);
+      if (pos < n) total += dur[pos];
+      m &= m - 1;
+    }
+  }
+  return total;
+}
+
+std::int64_t IntersectionVol(const BitSet& a, const BitSet& b,
+                             const std::vector<std::int64_t>& dur) {
+  std::int64_t total = 0;
+  const auto& wa = a.Words();
+  const auto& wb = b.Words();
+  const int n = a.Size();
+  for (std::size_t w = 0; w < wa.size(); ++w) {
+    std::uint64_t both = wa[w] & wb[w];
+    while (both) {
+      int bit = __builtin_ctzll(both);
+      int pos = static_cast<int>(w * 64 + bit);
+      if (pos < n) total += dur[pos];
+      both &= both - 1;
+    }
+  }
+  return total;
+}
+
+}  // namespace
+
+// ──── AnalyzeResponseTime (bitset-based) ──────────────────────────────────
+
 ResponseTimeAnalysis NodePriorityAssignmentAlgorithm::AnalyzeResponseTime(
     const dag::DagGraph& graph, const std::vector<int>& priorities,
     int core_count) const {
@@ -149,130 +227,133 @@ ResponseTimeAnalysis NodePriorityAssignmentAlgorithm::AnalyzeResponseTime(
   if (core_count <= 0 || priorities.size() != graph.NodeCount()) {
     return analysis;
   }
-  const std::vector<int> topo = graph.TopologicalOrder();
-  if (topo.size() != graph.NodeCount()) {
+  const std::vector<int> topo_id = graph.TopologicalOrder();
+  const int N = static_cast<int>(graph.NodeCount());
+  if (topo_id.size() != static_cast<std::size_t>(N)) {
     return analysis;
   }
 
-  std::unordered_map<int, int> priority_rank;
-  priority_rank.reserve(priorities.size());
+  // ── compact mapping: node ID ↔ position 0..N-1 ──────────────────────
+  std::unordered_map<int, int> pos_of;
+  pos_of.reserve(N);
+  std::vector<int> id_of(N);
+  for (int i = 0; i < N; ++i) {
+    int id = topo_id[i];
+    pos_of[id] = i;
+    id_of[i] = id;
+  }
+
+  // ── duration & priority rank by position ────────────────────────────
+  std::vector<std::int64_t> dur(N);
+  std::vector<int> prio_rank(N);
+  for (int i = 0; i < N; ++i) {
+    const dag::TaskNode* node = graph.GetNode(id_of[i]);
+    dur[i] = node ? node->duration : 0;
+    prio_rank[i] = N;  // sentinel: lowest priority
+  }
   for (std::size_t i = 0; i < priorities.size(); ++i) {
-    priority_rank[priorities[i]] = static_cast<int>(i);
+    auto it = pos_of.find(priorities[i]);
+    if (it != pos_of.end()) prio_rank[it->second] = static_cast<int>(i);
   }
 
-  std::unordered_map<int, std::vector<int>> predecessors;
-  predecessors.reserve(graph.NodeCount());
-  for (const dag::TaskNode& node : graph.Nodes()) {
-    predecessors[node.id] = {};
-  }
-  for (const dag::TaskNode& node : graph.Nodes()) {
-    for (int succ : node.outgoing_edges) {
-      if (predecessors.find(succ) != predecessors.end()) {
-        predecessors[succ].push_back(node.id);
-      }
-    }
-  }
-
-  std::unordered_map<int, std::unordered_set<int>> ancestors;
-  ancestors.reserve(graph.NodeCount());
-  for (int node_id : topo) {
-    std::unordered_set<int> anc;
-    for (int pred : predecessors[node_id]) {
-      anc.insert(pred);
-      const auto& pred_anc = ancestors[pred];
-      anc.insert(pred_anc.begin(), pred_anc.end());
-    }
-    ancestors[node_id] = std::move(anc);
-  }
-
-  std::unordered_map<int, std::unordered_set<int>> descendants;
-  descendants.reserve(graph.NodeCount());
-  for (auto it = topo.rbegin(); it != topo.rend(); ++it) {
-    int node_id = *it;
-    const dag::TaskNode* node = graph.GetNode(node_id);
-    if (node == nullptr) {
-      return analysis;
-    }
-    std::unordered_set<int> desc;
+  // ── predecessors by position ───────────────────────────────────────
+  std::vector<std::vector<int>> pred(N);
+  for (int i = 0; i < N; ++i) {
+    const dag::TaskNode* node = graph.GetNode(id_of[i]);
+    if (!node) return analysis;
     for (int succ : node->outgoing_edges) {
-      desc.insert(succ);
-      const auto& succ_desc = descendants[succ];
-      desc.insert(succ_desc.begin(), succ_desc.end());
+      auto it = pos_of.find(succ);
+      if (it != pos_of.end()) pred[it->second].push_back(i);
     }
-    descendants[node_id] = std::move(desc);
   }
 
-  // Pre-compute I(v) for each vertex
-  std::unordered_map<int, std::unordered_set<int>> I_v;
-  I_v.reserve(graph.NodeCount());
-  for (const dag::TaskNode& node : graph.Nodes()) {
-    std::unordered_set<int> iv;
-    for (const dag::TaskNode& cand : graph.Nodes()) {
-      if (cand.id == node.id) continue;
-      if (priority_rank[cand.id] >= priority_rank[node.id]) continue;
-      if (ancestors[node.id].find(cand.id) != ancestors[node.id].end())
-        continue;
-      if (descendants[node.id].find(cand.id) != descendants[node.id].end())
-        continue;
-      iv.insert(cand.id);
+  // ── ancestors bitsets (forward pass) ────────────────────────────────
+  std::vector<BitSet> ancestors(N, BitSet(N));
+  for (int i = 0; i < N; ++i) {
+    for (int p : pred[i]) {
+      ancestors[i].Set(p);
+      ancestors[i].OrWith(ancestors[p]);
     }
-    I_v[node.id] = std::move(iv);
   }
 
-  // Duration lookup helper
-  auto vol_of = [&](const std::unordered_set<int>& ids) -> std::int64_t {
-    std::int64_t total = 0;
-    for (int id : ids) {
-      const dag::TaskNode* n = graph.GetNode(id);
-      if (n != nullptr) total += n->duration;
+  // ── descendants bitsets (backward pass) ─────────────────────────────
+  std::vector<BitSet> descendants(N, BitSet(N));
+  for (int i = N - 1; i >= 0; --i) {
+    int id = id_of[i];
+    const dag::TaskNode* node = graph.GetNode(id);
+    if (!node) return analysis;
+    for (int succ : node->outgoing_edges) {
+      auto it = pos_of.find(succ);
+      if (it == pos_of.end()) continue;
+      int sp = it->second;
+      descendants[i].Set(sp);
+      descendants[i].OrWith(descendants[sp]);
     }
-    return total;
-  };
+  }
 
-  // DP: path_len, path_I, and R for each vertex
-  std::unordered_map<int, std::int64_t> path_len;
-  std::unordered_map<int, std::unordered_set<int>> path_I;
-  path_len.reserve(graph.NodeCount());
-  path_I.reserve(graph.NodeCount());
-  analysis.finish_time.reserve(graph.NodeCount());
+  // ── precompute priority masks: mask[r] = nodes with rank < r ────────
+  std::vector<BitSet> higher_prio_mask(N + 1, BitSet(N));
+  std::vector<int> rank_to_pos(N);
+  for (int i = 0; i < N; ++i) rank_to_pos[prio_rank[i]] = i;
+  for (int r = 1; r <= N; ++r) {
+    higher_prio_mask[r] = higher_prio_mask[r - 1];
+    higher_prio_mask[r].Set(rank_to_pos[r - 1]);
+  }
 
-  for (int node_id : topo) {
-    const dag::TaskNode* node = graph.GetNode(node_id);
-    if (node == nullptr) {
-      return {};
-    }
+  // ── I(v) bitsets ───────────────────────────────────────────────────
+  // I(v) = {c : prio_rank[c] < prio_rank[v], c ∉ ancestors[v],
+  //               c ∉ descendants[v], c ≠ v}
+  std::vector<BitSet> I_v(N, BitSet(N));
+  for (int v = 0; v < N; ++v) {
+    I_v[v].SetAll();
+    I_v[v].ClearBit(v);
+    I_v[v].AndNot(ancestors[v]);
+    I_v[v].AndNot(descendants[v]);
+    I_v[v].AndWith(higher_prio_mask[prio_rank[v]]);
+  }
 
-    if (predecessors[node_id].empty()) {
-      path_len[node_id] = node->duration;
-      path_I[node_id] = {};
+  // ── precompute vol of each I(v) ────────────────────────────────────
+  std::vector<std::int64_t> vol_I(N);
+  for (int i = 0; i < N; ++i) {
+    vol_I[i] = BitsetVol(I_v[i], dur);
+  }
+
+  // ── DP ─────────────────────────────────────────────────────────────
+  std::vector<std::int64_t> path_len(N, 0);
+  std::vector<BitSet> path_I(N, BitSet(N));
+  std::vector<std::int64_t> vol_path_I(N, 0);
+
+  double m = static_cast<double>(core_count);
+
+  for (int i = 0; i < N; ++i) {
+    int id = id_of[i];
+
+    if (pred[i].empty()) {
+      path_len[i] = dur[i];
+      vol_path_I[i] = 0;
     } else {
       double best_R = -1.0;
       int best_u = -1;
-      for (int u : predecessors[node_id]) {
-        std::unordered_set<int> cand_I = path_I[u];
-        const auto& iv = I_v[node_id];
-        cand_I.insert(iv.begin(), iv.end());
-
-        std::int64_t cand_vol = vol_of(cand_I);
+      for (int u : pred[i]) {
+        std::int64_t inter_vol = IntersectionVol(path_I[u], I_v[i], dur);
+        std::int64_t cand_vol = vol_path_I[u] + vol_I[i] - inter_vol;
         double cand_R = static_cast<double>(path_len[u]) +
-                        static_cast<double>(node->duration) +
-                        static_cast<double>(cand_vol) /
-                            static_cast<double>(core_count);
+                        static_cast<double>(dur[i]) +
+                        static_cast<double>(cand_vol) / m;
         if (cand_R > best_R) {
           best_R = cand_R;
           best_u = u;
         }
       }
-      path_len[node_id] = path_len[best_u] + node->duration;
-      path_I[node_id] = path_I[best_u];
-      path_I[node_id].insert(I_v[node_id].begin(), I_v[node_id].end());
+      path_len[i] = path_len[best_u] + dur[i];
+      path_I[i] = path_I[best_u];
+      path_I[i].OrWith(I_v[i]);
+      vol_path_I[i] = BitsetVol(path_I[i], dur);
     }
 
-    std::int64_t total_I_vol = vol_of(path_I[node_id]);
-    double r = static_cast<double>(path_len[node_id]) +
-               static_cast<double>(total_I_vol) /
-                   static_cast<double>(core_count);
-    analysis.finish_time[node_id] = r;
+    double r = static_cast<double>(path_len[i]) +
+               static_cast<double>(vol_path_I[i]) / m;
+    analysis.finish_time[id] = r;
     analysis.worst_response_time = std::max(analysis.worst_response_time, r);
   }
 

@@ -59,9 +59,18 @@ GeneratedDag DAGGenerator::RandomDAG(int n, double edge_prob,
   return dag;
 }
 
+namespace {
+std::string ResolveStgPath(const std::string& path) {
+  if (path.empty() || path[0] == '/') return path;
+  const char* dir = std::getenv("BUILD_WORKING_DIRECTORY");
+  if (!dir) return path;
+  return std::string(dir) + "/" + path;
+}
+}  // namespace
+
 GeneratedDag DAGGenerator::Resolve(const std::string& dag_name) {
   if (dag_name.find("stg:") == 0) {
-    std::string path = dag_name.substr(4);
+    std::string path = ResolveStgPath(dag_name.substr(4));
     GeneratedDag dag;
     dag.graph = io::StgReader::Read(path);
     dag.label = "stg:" + path;

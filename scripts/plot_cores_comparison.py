@@ -69,15 +69,15 @@ def main():
     graham_cores = np.array(graham_cores)
     valid_targets = np.array(valid_targets)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10),
-                                    gridspec_kw={"height_ratios": [3, 1]})
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 11),
+                                    gridspec_kw={"height_ratios": [2.5, 1]})
 
     # --- Top chart: min cores vs target ---
     ax1.plot(valid_targets, prio_cores,
-             "o-", color="#2c7bb6", linewidth=2, markersize=6,
+             "o-", color="#2c7bb6", linewidth=2.5, markersize=9,
              label="Priority-Based Min Cores")
     ax1.plot(valid_targets, graham_cores,
-             "s--", color="#d7191c", linewidth=2, markersize=6,
+             "s--", color="#d7191c", linewidth=2.5, markersize=9,
              label="Graham Min Cores")
 
     ax1.fill_between(valid_targets, prio_cores, graham_cores,
@@ -91,36 +91,38 @@ def main():
         x = valid_targets[i]
         ax1.annotate(f"{prio_cores[i]}",
                      xy=(x, prio_cores[i]),
-                     fontsize=7, color="#2c7bb6",
+                     fontsize=9, color="#2c7bb6",
                      ha="center", va="bottom",
-                     xytext=(0, 4), textcoords="offset points")
+                     xytext=(0, 5), textcoords="offset points")
         ax1.annotate(f"{graham_cores[i]}",
                      xy=(x, graham_cores[i]),
-                     fontsize=7, color="#d7191c",
+                     fontsize=9, color="#d7191c",
                      ha="center", va="bottom",
-                     xytext=(0, 4), textcoords="offset points")
+                     xytext=(0, 5), textcoords="offset points")
 
-    ax1.set_xlabel("Target Worst Response Time", fontsize=12)
-    ax1.set_ylabel("Minimum Cores Required", fontsize=12)
+    ax1.set_xlabel("Target Worst Response Time", fontsize=15)
+    ax1.set_ylabel("Minimum Cores Required", fontsize=15)
     ax1.set_title(f"Minimum Cores to Meet Response-Time Target\n"
                   f"DAG: {dag_label}",
-                  fontsize=13, fontweight="bold")
-    ax1.legend(loc="upper right", fontsize=9)
+                  fontsize=17, fontweight="bold")
+    ax1.legend(loc="upper right", fontsize=12)
+    ax1.tick_params(axis="both", labelsize=12)
     ax1.grid(True, alpha=0.3)
 
     # --- Bottom chart: core ratio ---
     ax2.plot(valid_targets, ratios,
-             "D-", color="#5e3c99", linewidth=2, markersize=5)
+             "D-", color="#5e3c99", linewidth=2.5, markersize=8)
     ax2.axhline(y=1.0, color="gray", linestyle=":", linewidth=1, alpha=0.7)
     ax2.fill_between(valid_targets, ratios, 1.0,
                      where=(np.array(ratios) < 1.0),
                      alpha=0.15, color="#5e3c99",
                      label="Priority / Graham ratio")
-    ax2.set_xlabel("Target Worst Response Time", fontsize=12)
-    ax2.set_ylabel("Core Ratio", fontsize=12)
-    ax2.set_title("Core Ratio (Priority / Graham)", fontsize=12)
+    ax2.set_xlabel("Target Worst Response Time", fontsize=15)
+    ax2.set_ylabel("Core Ratio", fontsize=15)
+    ax2.set_title("Core Ratio (Priority / Graham)", fontsize=15)
     ax2.grid(True, alpha=0.3)
-    ax2.legend(loc="upper right", fontsize=9)
+    ax2.tick_params(axis="both", labelsize=12)
+    ax2.legend(loc="upper right", fontsize=12)
 
     # Annotate ratio values
     for i in range(0, len(valid_targets)):
@@ -129,9 +131,9 @@ def main():
         if not np.isnan(ratios[i]):
             ax2.annotate(f"{ratios[i]:.2f}",
                          xy=(valid_targets[i], ratios[i]),
-                         fontsize=7, color="#5e3c99",
+                         fontsize=9, color="#5e3c99",
                          ha="center", va="bottom",
-                         xytext=(0, 4), textcoords="offset points")
+                         xytext=(0, 5), textcoords="offset points")
 
     # Summary text
     best_ratio = min(r for r in ratios if not np.isnan(r))
@@ -144,13 +146,13 @@ def main():
     props = dict(boxstyle="round,pad=0.5", facecolor="lightyellow",
                  alpha=0.9, edgecolor="gray")
     ax1.text(0.98, 0.97, textstr, transform=ax1.transAxes,
-             fontsize=8, verticalalignment="top",
+             fontsize=11, verticalalignment="top",
              horizontalalignment="right", bbox=props)
 
     fig.tight_layout()
     fmt = args.format or (args.output.rsplit(".", 1)[-1]
                            if "." in args.output else "png")
-    fig.savefig(args.output, format=fmt, dpi=150)
+    fig.savefig(args.output, format=fmt, dpi=200)
     print(f"Chart saved to {args.output}")
 
 

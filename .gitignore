@@ -3,7 +3,6 @@ compile_commands.json
 .claude/
 .cache/
 output/
-stg/
 referrence/
 chapters/
 plan/ 

@@ -73,48 +73,6 @@ cc_library(
 )
 
 cc_binary(
-    name = "dag_scheduler_compare",
-    srcs = ["src/compare_main.cpp"],
-    deps = [
-        ":dag_core",
-        ":node_priority_assignment_algorithm",
-        ":graham_response_time_algorithm",
-        ":dag_generator",
-        ":json_utils",
-        ":stg_reader",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_binary(
-    name = "dag_cores_compare",
-    srcs = ["src/compare_cores_main.cpp"],
-    deps = [
-        ":dag_core",
-        ":node_priority_assignment_algorithm",
-        ":graham_response_time_algorithm",
-        ":dag_generator",
-        ":json_utils",
-        ":minimum_core_algorithm",
-        ":stg_reader",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_binary(
-    name = "dag_scheduler_app",
-    srcs = ["src/main.cpp"],
-    deps = [
-        ":node_priority_assignment_algorithm",
-        ":graham_response_time_algorithm",
-        ":dag_core",
-        ":dag_generator",
-        ":stg_reader",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_binary(
     name = "dag_terminal",
     srcs = ["src/terminal_app.cpp"],
     deps = [
